@@ -1,0 +1,45 @@
+**************** << DOCUMENTATION >> ****************
+
+[Creation of stack descriptor]
+
+#define MAX_STACK 10
+
+typedef struct
+{
+	key_t stackKey;	/* key for the shared memory of a stack */
+	int stackdescid; /* shared stack memory segment id */
+	int data_size; /* data element size for this stack */
+	int stack_size; /* size for this stack */
+	void *stack_top; /* pointer to this stack */
+	int elements_no; /* present no of elements */
+	bool free; /* whether this descriptor is free for use */
+}stackdesc; /* stack descriptor structure */
+
+> [Allocate shared memory for stack descriptor -> stackdesc]
+{
+	Designing a function that allocates shared memory of size (size of stackdesc)*(MAX_STACK) using a key. This function initialises the stack descriptor for all the stacks to be created as follows:
+
+	+ stackKey == -1 to indicate that this descriptor has not yet been associated with any user generated key
+	+ shmid == -1 to indicate that this descriptor does have shared memory segment associated with it.
+	+ data_size = stack_size == 0
+	+ free == [true] to indicate that the stack descriptor is free to use
+}
+
+> [shstackget(key_t key, int element_size, int stack_size)]
+{
+	+ The function should check whether there is a stack with this key if not, finds a [free] stackdesc for this stack, allocates shared memory segment for this stack.
+	+ element_size is for various data types
+	+ stack_size indicates the stack
+}
+
+> [shstackpush(stackdesc *point_desc, void* element)]
+{
+	+ Pushes the value 'element', into the stack pointed by (*(p_desc)).elements_no
+	+ (*(p_desc)).elements_no++;
+}
+
+> [shstackpop(stackdesc *point_desc)]
+{
+	+ Pops the value from the top of the stack pointed by (*(p_desc)).elements_no
+	+ (*(p_desc)).elements_no--;
+}

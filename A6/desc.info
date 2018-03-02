@@ -1,0 +1,63 @@
+typedef unsigned long int ul;
+typedef unsigned int ui;
+typedef unsigned char uc;
+
+/* proposed super block structure */
+
+typedef struct {
+	ul fssize; /* file system size */
+	ui root_inode_no; /* stores root (/) inode number */
+	ui block_size; /* size of block */
+	ui inode_size; /* size of each inode */
+	ul inode_start_location; /* inode starting location */
+	ui inode_count; /* number of inodes present in fs */
+	ui free_inode_count; /* number of free inodes that are yet to be pointed to data blocks */
+	ul data_block_start_location; /* data block starting location */
+	ui data_block_count; /* count for data blocks */
+	ui free_data_block_count; /* free data blocks */
+	uc ibm[IBM_SIZE];
+	uc dbm[DBM_SIZE];
+} superblock;
+
+#define SUPER_BLOCK_SIZE sizeof(superblock)
+
+/* proposed inode structure */
+
+typedef struct {
+	char type; /* d: directory, f: file, l: symbolic link, etc. */
+	int size; /* size of corresponding file */
+	int datablock_count; /* data blocks allocated for storing the d,f,l,etc. type file */
+	int datablocks[MAX_DATA_BLOCKS_PER_INODE]; /* max data blocks that can be allocated */
+} inode;
+
+#define INODE_SIZE sizeof(inode)
+
+* Approach:
+
+1) creating myfs.c
+2) gcc myfs.c -o myfs
+   ./myfs
+
+3) myfs returns a prompt: myfs>
+4) implementing basic commands like rm, ls, cp, use, mkfs
+5) creation of file system
+6) structure of file system
+7) structure of super block (proposed)
+8) structure of inode (proposed)
+9) syscalls to be used: open, lseek, write, read, write, creat
+
+/* Furthermore */
+
+* To be done on shell, created with prompt " myfs> "
+
++ "mkfs" osfile1 512 10MB /* creates filesystem on file osfile1 with block size 512B */
++ "use" osfile1 as C: /* osfile1 will be used as C: */
++ "cp" osfile3 C:tesfile1 /* copy the file osfile3 from os to the filesystem C: as testfile1 */
++ "ls" C:/ /* prints the contents of C: */
++ "rm" C:testfile1 /* delete testfile1 from C: */
+
+/* Furthermore */
+
++ datanode of parent directory, stores the filename and filename_size of all sub directories/ files
++ osfile = [superblocks][inodes][datablocks]
++ etc ..
