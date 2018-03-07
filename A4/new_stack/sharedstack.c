@@ -172,23 +172,23 @@ void shstackrm(int stack_id)
 
     stack_sh* stack_ptr = (stack_sh*)shmat(global_shmid, NULL, 0);
     P(semid);
-    if(shmctl(stack_ptr->shared_stack[stack_id].shmid, IPC_RMID, NULL) == 1) 
+    if(stack_ptr->shared_stack[stack_id].free == false)
+    {
+        stack_ptr->shared_stack[stack_id].stackKey = -1;
+        stack_ptr->shared_stack[stack_id].shmid = -1;
+        stack_ptr->shared_stack[stack_id].data_size = 0;
+        stack_ptr->shared_stack[stack_id].stack_size = 0;
+        stack_ptr->shared_stack[stack_id].elem_num = 0;
+        stack_ptr->shared_stack[stack_id].free = true; /* free to use */
+        V(semid);
+        shmctl(stack_ptr->shared_stack[stack_id].shmid, IPC_RMID, NULL);
+        printf("(+) Stack Remove >> Sucessful! with Stack ID = %d\n", stack_id);
+    }
+    else
     {
         printf("(+) Stack Remove >> Unsuccessful!\n");
         V(semid);
     }
-    else 
-    {
-        printf("(+) Stack Remove >> Sucessful! with Stack ID = %d\n", stack_id);
-        V(semid);
-    }
-    
-    stack_ptr->shared_stack[stack_id].stackKey = -1;
-    stack_ptr->shared_stack[stack_id].shmid = -1;
-    stack_ptr->shared_stack[stack_id].data_size = 0;
-    stack_ptr->shared_stack[stack_id].stack_size = 0;
-    stack_ptr->shared_stack[stack_id].elem_num = 0;
-    stack_ptr->shared_stack[stack_id].free = true; /* free to use */
 
     printf("Do you want to deleted the shared stack? (0: Yes, 1: No) -> ");
     fflush(stdout);

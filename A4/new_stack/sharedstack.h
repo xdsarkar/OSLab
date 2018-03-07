@@ -53,6 +53,6 @@ typedef struct
 {
     stack_desc shared_stack[MAX_STACK];
     bool initialize_stack;
-} stack_sh;                               
+} stack_sh; 
 
 #endif
