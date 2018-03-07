@@ -22,97 +22,6 @@ int global_shmid;
 #define keyg(i) ftok("..", i)
 #define keypub(i) ftok(".", i)
 
-
-// /* int semop(int semid, struct sembuf *sops, size_t nsops); */
-// #define P(s) semop(s, &POP, 1);
-// #define V(s) semop(s, &VOP, 1);
-
-// /* defining structure sembuf for 2 operations Pop/Vop */
-// struct sembuf POP;
-// struct sembuf VOP;
-
-// union semun 
-// {
-//     int              val;    /* Value for SETVAL */
-//     struct semid_ds *buf;    /* Buffer for IPC_STAT, IPC_SET */
-//     unsigned short  *array;  /* Array for GETALL, SETALL */
-//     struct seminfo  *__buf;  /* Buffer for IPC_INFO (Linux-specific) */
-// } setvalArg;
-
-// union semun setvalArg = {.val = 1};
-
-// /* pop */
-// struct sembuf POP = {.sem_num = 0, .sem_op = -1, .sem_flg = SEM_UNDO};
-// /* vop */
-// struct sembuf VOP = {.sem_num = 0, .sem_op = 1, .sem_flg = SEM_UNDO};
-
-
-// key_t key1, key2, key3;
-
-// key1 = keyg(20);
-// key2 = keyg(30);
-// key3 = keyg(40);
-
-// int semid1 = semget(key1,1,IPC_CREAT|0777|IPC_EXCL); /* int semget(key_t key, int nsems, int semflg); */
-// if(semid1 == -1) 
-// {
-//     semid1 = semget(key1,1,IPC_CREAT|0777);
-//     if(semid1 == -1) 
-//     {
-//         perror("semget() failed");
-//         exit(1);
-//     }
-// } 
-// else 
-// {
-//     int status1 = semctl(semid1,0,SETVAL,setvalArg);
-//     if(status1 == -1) 
-//     {
-//         perror("semctl() failed");
-//         exit(1);
-//     }
-// }
-
-// int semid2 = semget(key2,1,IPC_CREAT|0777|IPC_EXCL); /* int semget(key_t key, int nsems, int semflg); */
-// if(semid2 == -1) 
-// {
-//     semid2 = semget(key2,1,IPC_CREAT|0777);
-//     if(semid2 == -1) 
-//     {
-//         perror("semget() failed");
-//         exit(1);
-//     }
-// } 
-// else 
-// {
-//     int status2 = semctl(semid2,0,SETVAL,setvalArg);
-//     if(status2 == -1) 
-//     {
-//         perror("semctl() failed");
-//         exit(1);
-//     }
-// }
-
-// int semid3 = semget(key3,1,IPC_CREAT|0777|IPC_EXCL); /* int semget(key_t key, int nsems, int semflg); */
-// if(semid3 == -1) 
-// {
-//     semid3 = semget(key3,1,IPC_CREAT|0777);
-//     if(semid3 == -1) 
-//     {
-//         perror("semget() failed");
-//         exit(1);
-//     }
-// } 
-// else 
-// {
-//     int status3 = semctl(semid3,0,SETVAL,setvalArg);
-//     if(status3 == -1) 
-//     {
-//         perror("semctl() failed");
-//         exit(1);
-//     }
-// }
-
 typedef struct
 {
     key_t stackKey; /* key to the shared memory segment of the stack */
@@ -184,7 +93,6 @@ void shstackpush(int stack_id, void element)
     stack_sh* stack_ptr = (stack_sh*)shmat(global_shmid, NULL, 0);
     int elem_num = stack_ptr->shared_stack[stack_id].elem_num;
     int st_size = stack_ptr->shared_stack[stack_id].stack_size;
-    int data_size = stack_ptr->shared_stack[stack_id].data_size; 
     if(elem_num == st_size) /* stack is full */
     {
         printf("Stack ID = %d >> Stack is full! Pop first, duh!\n", stack_id);
@@ -205,9 +113,7 @@ void shstackpop(int stack_id)
 {
     stack_sh* stack_ptr = (stack_sh*)shmat(global_shmid, NULL, 0);
     if(stack_ptr == (void *)(-1)) perror("shmat() failed: ");
-    
-    int elem_num = stack_ptr->shared_stack[stack_id].elem_num;
-    int data_size = stack_ptr->shared_stack[stack_id].data_size; 
+    int elem_num = stack_ptr->shared_stack[stack_id].elem_num; 
     if(elem_num == 0) /* stack is empty */
     {
         printf("Stack ID = %d >> Stack is empty! You can't pop, anymore!\n", stack_id);
@@ -264,7 +170,6 @@ void shstackrm(int stack_id)
     shmdt((void *)stack_ptr);
 }
 
-/*
 void print_current_stack(int stack_id)
 {
     stack_sh* stack_ptr = (stack_sh*)shmat(global_shmid, NULL, 0);
@@ -293,7 +198,6 @@ void print_current_stack(int stack_id)
     shmdt((void *)ptr); 
     shmdt((void *)stack_ptr);
 }
-*/
 
 void instructions()
 {
