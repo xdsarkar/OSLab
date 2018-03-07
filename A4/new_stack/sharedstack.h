@@ -35,6 +35,8 @@ int shstackget(key_t, int, int, int);
 struct sembuf POP;
 struct sembuf VOP;
 
+key_t univ_key;
+int global_shmid;
 int semid;
 
 typedef struct

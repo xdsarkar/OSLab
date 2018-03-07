@@ -1,8 +1,5 @@
 #include "sharedstack.h" /* personal creater header */
 
-key_t univ_key;
-int global_shmid;
-
 /* for loops */
 #define FOR(i,j) for(int i=0; i<j; i++)
 #define FORB(i,j) for(int i=j; i>0; i--)
