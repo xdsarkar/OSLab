@@ -40,7 +40,7 @@ int shstackget(key_t key, int element_size, int stack_size, int shm_stack_flg)
             perror("semget() failed");
             exit(1);
         }
-    } 
+    }
     else 
     {
         int status = semctl(semid, 0, SETVAL, setvalArg);
@@ -167,7 +167,7 @@ void shstackrm(int stack_id)
 
     sleep(1); 
     /* Observation: When shstackpush() is called, it pushes fine and as well as prints,
-    but if shstackpop() is immediately used prior to shstackrm(), 
+    but if shstackpop() is immediately used prior to print_current_stack(), 
     pop was done but it couldn't print. So introduction to sleep, "helps" */
 
     stack_sh* stack_ptr = (stack_sh*)shmat(global_shmid, NULL, 0);
@@ -210,6 +210,7 @@ void shstackrm(int stack_id)
                 {
                     V(semid);
                     shmctl(stack_ptr->shared_stack[i].shmid, IPC_RMID, NULL);
+                    semctl(semid, i, IPC_RMID);
                     printf("(+) Stack ID = %d is also deleted as shared stack is not there!\n", i);
                 }
             }

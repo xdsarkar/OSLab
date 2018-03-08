@@ -21,4 +21,4 @@ sample2.o:
 	$(CC) -I . -c sample2.c
 
 clean:	
-	rm sharedstack.o sample1.o sample2.o sample1 sample2 sharedlib.a
+	rm *.o sample1 sample2 *.a

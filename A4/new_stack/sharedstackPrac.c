@@ -101,7 +101,7 @@ void shstackpush(int stack_id, void element)
     {
         int *ptr = (int *)shmat(stack_ptr->shared_stack[stack_id].shmid, NULL, 0);
         int elem_num = stack_ptr->shared_stack[stack_id].elem_num;
-        *(ptr + (elem_num*data_size)) = element;
+        *(ptr + elem_num) = element;
         stack_ptr->shared_stack[stack_id].elem_num++;
         printf("Stack ID = %d >> Pushed element\n", stack_id);   
         shmdt((void *)ptr);

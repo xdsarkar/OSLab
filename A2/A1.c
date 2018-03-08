@@ -19,8 +19,7 @@ int main(int argc, char **argv)
 		}
 		else if(pid > 0)
 		{
-			wait(NULL); //waits for child to end
-			printf("\nParent");
+			wait(NULL);
 		}
 	}
 	return 0;
