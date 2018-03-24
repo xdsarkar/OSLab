@@ -31,16 +31,16 @@ int shstackget(key_t key, int element_size, int stack_size, int shm_stack_flg)
     setvalArg.val = 1;
 
     key_t key_sem = keyg(10);
-    int semid = semget(key_sem, 1,IPC_CREAT | 0777 | IPC_EXCL); /* int semget(key_t key, int nsems, int semflg); */
+    int semid = semget(key_sem, 1, IPC_CREAT | 0777 | IPC_EXCL); /* int semget(key_t key, int nsems, int semflg); */
     if(semid == -1) 
     {
-        semid = semget(key_sem, 1, IPC_CREAT | 0777);
+        semid = semget(keysem, 1, IPC_CREAT | 0777);
         if(semid == -1) 
         {
             perror("semget() failed");
             exit(1);
         }
-    }
+    } 
     else 
     {
         int status = semctl(semid, 0, SETVAL, setvalArg);
@@ -155,23 +155,12 @@ void shstackpop(int stack_id)
 
 void shstackrm(int stack_id)
 {
-    /* pop */
-    POP.sem_num = stack_id;
-    POP.sem_op = -1;
-    POP.sem_flg = SEM_UNDO;
-
-    /* vop */
-    VOP.sem_num = stack_id;
-    VOP.sem_op = 1;
-    VOP.sem_flg = SEM_UNDO;
-
     sleep(1); 
     /* Observation: When shstackpush() is called, it pushes fine and as well as prints,
     but if shstackpop() is immediately used prior to print_current_stack(), 
     pop was done but it couldn't print. So introduction to sleep, "helps" */
 
-    stack_sh* stack_ptr = (stack_sh*)shmat(global_shmid, NULL, 0);
-    P(semid);
+    stack_sh* stack_ptr = (stack_sh*)shmat(global_shmid, NULL, 0);;
     if(stack_ptr->shared_stack[stack_id].free == false)
     {
         stack_ptr->shared_stack[stack_id].stackKey = -1;
@@ -180,26 +169,16 @@ void shstackrm(int stack_id)
         stack_ptr->shared_stack[stack_id].stack_size = 0;
         stack_ptr->shared_stack[stack_id].elem_num = 0;
         stack_ptr->shared_stack[stack_id].free = true; /* free to use */
-        V(semid);
-        shmctl(stack_ptr->shared_stack[stack_id].shmid, IPC_RMID, NULL);
         printf("(+) Stack Remove >> Sucessful! with Stack ID = %d\n", stack_id);
     }
-    else
-    {
-        printf("(+) Stack Remove >> Unsuccessful!\n");
-        V(semid);
-    }
+    else printf("(+) Stack Remove >> Unsuccessful!\n");
 
     printf("Do you want to deleted the shared stack? (0: Yes, 1: No) -> ");
     fflush(stdout);
     int in; scanf("%d",&in);
     if(in == 0)
     {
-        if(shmctl(global_shmid, IPC_RMID, NULL) == 1) 
-        {
-            printf("(+) Shared Stack Remove >> Unsuccessful!\n");
-            V(semid);
-        }
+        if(shmctl(global_shmid, IPC_RMID, NULL) == 1) printf("(+) Shared Stack Remove >> Unsuccessful!\n");
         else
         {
             printf("(+) Shared Stack Remove >> Sucessful!\n");
@@ -208,19 +187,14 @@ void shstackrm(int stack_id)
             {
                 if(stack_ptr->shared_stack[i].free == false)
                 {
-                    V(semid);
                     shmctl(stack_ptr->shared_stack[i].shmid, IPC_RMID, NULL);
-                    semctl(semid, i, IPC_RMID);
+                    semctl(semid, i, IPC_RMID, 0);
                     printf("(+) Stack ID = %d is also deleted as shared stack is not there!\n", i);
                 }
             }
         }
     }
-    else 
-    {
-        printf("Okay, as you wish! But don't forget to delete me! Else when you ipcs, you'll see me there!\n");
-        V(semid);
-    }
+    else printf("Okay, as you wish! But don't forget to delete me! Else when you ipcs, you'll see me there!\n");
     shmdt((void *)stack_ptr);
 }
 

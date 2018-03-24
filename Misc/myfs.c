@@ -238,7 +238,8 @@ void create_dir(char *filename, char *dirname)
 		fputs(USE_FILE_NOT_FOUND, stdout);
 		newline();
 		return;
-	} 	
+	}
+		
 	for(i = 0; i < MAX_DRIVE; i++)
 	{
 		if(strcmp(fdmap[i].file_name, filename) == 0)
