@@ -9,24 +9,18 @@
 #include <sys/ioctl.h>
 #include <stdbool.h>
 
-typedef unsigned long int ul;
-typedef unsigned int ui;
-typedef unsigned char uc;
-
-#define SUPER_BLOCK_SIZE sizeof(superblock)
-#define INODE_BLOCK_SIZE sizeof(inode)
-
 #define IBM_SIZE 10
 #define DBM_SIZE 10
 #define MAX_DATA_BLOCKS_PER_INODE 10
 #define MAX_DRIVE 10
 #define INODE_COUNT 10
 #define MAX_DB 10
-#define PROMPT "$myfs>"
 #define MAX_DRIVE 10
 #define MAX_FILE 50
 
-/* system calls */
+#define ANSI_COLOR_RED "\x1b[31m"
+#define ANSI_COLOR_RESET "\x1b[0m"
+
 #define EXIT "exit"
 #define MKFS "mkfs"
 #define LS "ls"
@@ -34,20 +28,21 @@ typedef unsigned char uc;
 #define USE "use"
 #define MV "mv"
 #define RM "rm"
+#define MAN "man"
 
 typedef struct {
-	ul fssize; /* file system size in blocks */
-	ui root_inode_no; /* stores root (/) inode number */
-	ui block_size; /* size of block */
-	ui inode_size; /* size of each inode */
-	ul inode_start_location; /* inode starting location */
-	ui inode_count; /* number of inodes present */
-	ui free_inode_count; /* number of free inodes that are yet to be pointed to data blocks */
-	ul data_block_start_location; /* data block starting location */
-	ui data_block_count; /* count for data blocks */
-	ui free_data_block_count; /* free data blocks */
-	uc ibm[IBM_SIZE];
-	uc dbm[DBM_SIZE];
+	int fssize; /* file system size in blocks */
+	int root_inode_no; /* stores root (/) inode number */
+	int block_size; /* size of block */
+	int inode_size; /* size of each inode */
+	int inode_start_location; /* inode starting location */
+	int inode_count; /* number of inodes present */
+	int free_inode_count; /* number of free inodes that are yet to be pointed to data blocks */
+	int data_block_start_location; /* data block starting location */
+	int data_block_count; /* count for data blocks */
+	int free_data_block_count; /* free data blocks */
+	char ibm[IBM_SIZE];
+	char dbm[DBM_SIZE];
 } superblock;
 
 typedef struct {
@@ -57,6 +52,9 @@ typedef struct {
 	int datablocks[MAX_DATA_BLOCKS_PER_INODE]; /* max data blocks that can be allocated */
 } inode;
 
+#define SUPER_BLOCK_SIZE sizeof(superblock)
+#define INODE_BLOCK_SIZE sizeof(inode)
+
 typedef struct {
 	char file[MAX_FILE];
 	char drive[MAX_DRIVE];
@@ -64,16 +62,25 @@ typedef struct {
 
 file_drive fdmap[MAX_DRIVE];
 
+typedef struct {
+	char file[MAX_FILE];
+} file2delete;
+
+file2delete file_del[MAX_DRIVE];
+
 void init_bitmap();
 void tokenize(char *);
 void call_sys_calls(char [][10], int);
-void create_fs(char *, long, int);
-void mk_dir(char *, char *);
+void mkfs(char *, long, int);
+void use(char *, char *);
 void writeScr(char *, int, int);
-void cp_osfile2drive(char *, char *);
-void remove_file(char *);
-void list_files(char *);
-void move_file(char *, char *);
+void cp(char *, char *);
+void rm(char *);
+void ls(char *);
+void mv(char *, char *);
+void exit_fs();
+void init_file_delete();
+void manual(char *);
 
 int main()
 {
@@ -83,19 +90,34 @@ int main()
     ioctl(0, TIOCGWINSZ, &w);
     int columns = w.ws_col;
     int rows = w.ws_row;
-    writeScr("***SASH FILE SYSTEM***\n", w.ws_row, w.ws_col);
+    writeScr("< [SASH] - [FILE] - [SYSTEM] >\n", w.ws_row, w.ws_col);
+    writeScr("------------------------------\n", w.ws_row, w.ws_col);
+    writeScr("< Manual Entries Also Available >\n", w.ws_row, w.ws_col);
+    writeScr("< Subham Sarkar >\n", w.ws_row, w.ws_col);
 
 	init_bitmap();
+	init_file_delete();
 	char command[1024];
 	while(true)
 	{
-		printf(PROMPT); fflush(stdout);
+		printf(ANSI_COLOR_RED "$myfs>" ANSI_COLOR_RESET); fflush(stdout);
 		fgets(command, 1024, stdin);
 		if(strcmp(command, "\n") == 0) continue;
 		command[strlen(command)-1]='\0';
-		if(strcmp(command, EXIT) == 0) break;
+		if(strcmp(command, EXIT) == 0)
+		{
+			exit_fs();
+			exit(0);
+		}
 		else tokenize(command);
 	}
+}
+
+static unsigned get_file_size (const char * file_name)
+{
+    struct stat sb;
+    if (stat (file_name, & sb) != 0) exit (EXIT_FAILURE);
+    return sb.st_size;
 }
 
 void tokenize(char *command)
@@ -119,7 +141,8 @@ void call_sys_calls(char subcommands[][10], int no_commands)
 		{
 			long fs_size = atoi(subcommands[3]) * 1024 * 1024;
 			int block_size = atoi(subcommands[2]);
-			create_fs(subcommands[1], fs_size, block_size);
+			mkfs(subcommands[1], fs_size, block_size);
+			return;
 		}
 		else 
 		{
@@ -131,7 +154,8 @@ void call_sys_calls(char subcommands[][10], int no_commands)
 	{
 		if(no_commands == 4)
 		{
-			mk_dir(subcommands[1], subcommands[3]);
+			use(subcommands[1], subcommands[3]);
+			return;
 		}
 		else if((no_commands != 4) || (strcmp(subcommands[2], "as") != 0))
 		{
@@ -143,7 +167,8 @@ void call_sys_calls(char subcommands[][10], int no_commands)
 	{
 		if(no_commands == 3)
 		{
-			cp_osfile2drive(subcommands[1], subcommands[2]);
+			cp(subcommands[1], subcommands[2]);
+			return;
 		}
 		else
 		{
@@ -155,7 +180,8 @@ void call_sys_calls(char subcommands[][10], int no_commands)
 	{
 		if(no_commands == 2)
 		{
-			list_files(subcommands[1]);
+			ls(subcommands[1]);
+			return;
 		}
 		else
 		{
@@ -167,7 +193,8 @@ void call_sys_calls(char subcommands[][10], int no_commands)
 	{
 		if(no_commands == 2)
 		{
-			remove_file(subcommands[1]);
+			rm(subcommands[1]);
+			return;
 		}
 		else
 		{
@@ -179,20 +206,38 @@ void call_sys_calls(char subcommands[][10], int no_commands)
 	{
 		if(no_commands == 3)
 		{
-			move_file(subcommands[1], subcommands[2]);
+			mv(subcommands[1], subcommands[2]);
+			return;
 		}
 		else
 		{
 			printf("sash: mv command failed: expected > mv [source] [destination]\n");
 			return;
 		}
-
+	}
+	else if(strcmp(subcommands[0], MAN) == 0) /* manual */
+	{
+		if(no_commands == 2)
+		{
+			manual(subcommands[1]);
+			return;
+		}
+		else
+		{
+			printf("sash: man command failed: expected > man [sys_call]\n");
+			return;
+		}
 	}
 	else
 	{
 		printf("sash: command not found: %s\n", subcommands[0]);
 		return;
 	}
+}
+
+void init_file_delete()
+{
+	for(int i = 0; i < MAX_DRIVE; i++) strcpy(file_del[i].file, "\0");
 }
 
 void init_bitmap()
@@ -204,7 +249,7 @@ void init_bitmap()
 	}
 }
 
-void create_fs(char *path, long fs_size, int block_size)
+void mkfs(char *path, long fs_size, int block_size)
 {
 	superblock sb; inode ino;
 	sb.fssize = fs_size; /* file system size in blocks */
@@ -233,6 +278,7 @@ void create_fs(char *path, long fs_size, int block_size)
 	if(file == -1) 
 	{
 		printf("sash: File system exists %s\n", path);
+		close(file);
 		return;
 	}
 
@@ -241,9 +287,10 @@ void create_fs(char *path, long fs_size, int block_size)
 	{
 		printf("sash: Superblock write successful\n");
 	}
-	else 
+	else
 	{
 		printf("sash: Superblock write failed\n");
+		close(file);
 		return;
 	}
 
@@ -255,14 +302,29 @@ void create_fs(char *path, long fs_size, int block_size)
 	else
 	{
 		printf("sash: Root inode write failed\n");
+		close(file);
 		return;
 	}
-	
+
+	printf("Size of Super Block: %ld B\n", SUPER_BLOCK_SIZE);
+	printf("Size of Inode Block: %ld B\n", INODE_BLOCK_SIZE);
+	printf("File System Size: %d KB\n", (int)fs_size/(1024));
+	printf("Block Size: %d B\n", (int)block_size);
+
+	for(int i = 0; i < MAX_DRIVE; i++)
+	{
+		if(strcmp(file_del[i].file, "\0") == 0)
+		{
+			strcpy(file_del[i].file, path);
+			break;
+		}
+	}
+	truncate(path, fs_size);
 	close(file);
 	return;
 }
 
-void mk_dir(char *filename, char *dirname)
+void use(char *filename, char *dirname)
 {
 	char drive_n[MAX_DRIVE];
 	int i=0; while(dirname[i] != ':')
@@ -305,10 +367,10 @@ void mk_dir(char *filename, char *dirname)
 	}
 }
 
-void cp_osfile2drive(char *filename, char *drive_file)
+void cp(char *filename, char *drive_file)
 {
 	superblock sn; inode in;
-	int fd_source, fd_destination;
+	int fd_source, fd_destination, fd_dest;
 	char drive[MAX_DRIVE];
 	char file_n[MAX_FILE];
 	int i=0; while(drive_file[i] != ':')
@@ -329,6 +391,7 @@ void cp_osfile2drive(char *filename, char *drive_file)
 	if(fd_source == -1)
 	{
 		printf("sash: File <%s> doesn't exists\n", filename);
+		close(fd_source);
 		return;
 	}
 
@@ -336,47 +399,55 @@ void cp_osfile2drive(char *filename, char *drive_file)
 	{
 		if(strcmp(fdmap[i].drive, drive) == 0)
 		{
-			fd_destination = open(fdmap[i].file, O_WRONLY | O_CREAT | O_EXCL);
-			if(fd_destination == -1)
+			if(strcmp(fdmap[i].file, "\0")==0)
 			{
-				printf("sash: %s already exists. Want to overwrite? Press 1, else 0\n", fdmap[i].file);
-				int take; scanf("%d", &take);
-				if(take == 0)
-				{
-					printf("sash: Can't overwrite\n");
-					return;
-				}
-				else
-				{
-					strcpy(fdmap[i].file, file_n);
-					int fd_over = open(fdmap[i].file, O_WRONLY | O_CREAT);
-					int read_st = read(fd_source, (void *)&sn, sizeof(sn));
-					int wr_st = write(fd_over, (void*)&sn, sizeof(sn));
-					read_st = read(fd_source, (void*)&in, sizeof(in));
-					wr_st = write(fd_over, (void*)&in, sizeof(in));
-					return;
-				}
-			}
-			else
-			{
+				fd_dest = open(fdmap[i].file, O_WRONLY | O_CREAT);
 				printf("sash: Copy file %s to %s\n", filename, drive_file);
 				strcpy(fdmap[i].file, file_n);
 				int read_st = read(fd_source, (void *)&sn, sizeof(sn));
-				int wr_st = write(fd_destination, (void*)&sn, sizeof(sn));
+				int wr_st = write(fd_dest, (void*)&sn, sizeof(sn));
 				read_st = read(fd_source, (void*)&in, sizeof(in));
-				wr_st = write(fd_destination, (void*)&in, sizeof(in));
+				wr_st = write(fd_dest, (void*)&in, sizeof(in));
+				close(fd_source);
+				close(fd_dest);
+				return;
 			}
-			break;
-		}
-		else
-		{
-			printf("sash: First use file %s as %s\n", filename, drive_file);
-			return;
+			else
+			{
+				fd_destination = open(fdmap[i].file, O_WRONLY | O_CREAT | O_EXCL);
+				if(fd_destination == -1)
+				{
+					printf("sash: %s already exists. Want to overwrite? Press 1, else 0\n", fdmap[i].file);
+					int take; scanf("%d", &take);
+					if(take == 0)
+					{
+						printf("sash: Can't overwrite\n");
+						close(fd_source);
+						close(fd_destination);
+						return;
+					}
+					else
+					{
+						strcpy(fdmap[i].file, file_n);
+						printf("sash: Copy file %s to %s\n", filename, drive_file);
+						int fd_over = open(fdmap[i].file, O_WRONLY | O_CREAT);
+						int read_st = read(fd_source, (void *)&sn, sizeof(sn));
+						int wr_st = write(fd_over, (void*)&sn, sizeof(sn));
+						read_st = read(fd_source, (void*)&in, sizeof(in));
+						wr_st = write(fd_over, (void*)&in, sizeof(in));
+						close(fd_source);
+						close(fd_destination);
+						return;
+					}
+				}
+			}
 		}
 	}
+	printf("sash: First use file %s as %s\n", filename, drive_file);
+	return;
 }
 
-void remove_file(char *drive_file)
+void rm(char *drive_file)
 {
 	char drive[MAX_DRIVE];
 	char file_n[MAX_FILE];
@@ -409,15 +480,21 @@ void remove_file(char *drive_file)
 				return;
 			}
 		}
-		else
-		{
-			printf("sash: Drive %s: doesn't exists. Cannot proceed operation.\n", drive);
-			return;
-		}
 	}
+	printf("sash: Drive %s: doesn't exists. Cannot proceed operation.\n", drive);
+	return;
 }
 
-void list_files(char *drive)
+void exit_fs()
+{
+	for(int i=0; i<MAX_DRIVE; i++)
+	{
+		if(strcmp(file_del[i].file, "\0") != 0) remove(file_del[i].file);
+	}
+	return;
+}
+
+void ls(char *drive)
 {
 	char drive_name[MAX_DRIVE];
 	int i=0; while(drive[i] != ':')
@@ -430,7 +507,7 @@ void list_files(char *drive)
 	{
 		if((strcmp(fdmap[i].drive, drive_name)==0) && (strcmp(fdmap[i].file, "\0") != 0))
 		{
-			printf("-> %s\n", fdmap[i].file);
+			printf("-> %s -> size: %d KB\n", fdmap[i].file, get_file_size(fdmap[i].file)/1024);
 			return;
 		}
 		else if((strcmp(fdmap[i].drive, drive_name)==0) && (strcmp(fdmap[i].file, "\0") == 0))
@@ -443,7 +520,7 @@ void list_files(char *drive)
 	return;
 }
 
-void move_file(char *source, char *destination)
+void mv(char *source, char *destination)
 {
 	int fd_source, fd_destination;
 	superblock sn; inode in;
@@ -485,7 +562,7 @@ void move_file(char *source, char *destination)
 	{
 		if(strcmp(fdmap[i].drive, source_drive) == 0)
 		{
-			printf("Source Drive %s: exists\n", source_drive);
+			printf("Source Drive %s: exists. Proceed.\n", source_drive);
 			pos_source = i;
 			flagsource = 1;
 		}
@@ -495,7 +572,7 @@ void move_file(char *source, char *destination)
 	{
 		if(strcmp(fdmap[i].drive, dest_drive) == 0)
 		{
-			printf("Destination Drive %s: exists\n", dest_drive);
+			printf("Destination Drive %s: exists. Proceed.\n", dest_drive);
 			pos_dest = i;
 			flagdest = 1;
 		}
@@ -519,6 +596,7 @@ void move_file(char *source, char *destination)
 		if(fd_source == -1)
 		{
 			printf("sash: %s doesn't exists in %s:\n", file_source, source_drive);
+			close(fd_source);
 			return;
 		}
 		fd_destination = open(fdmap[pos_dest].file, O_WRONLY | O_CREAT | O_EXCL);
@@ -529,6 +607,8 @@ void move_file(char *source, char *destination)
 			if(take == 0)
 			{
 				printf("sash: Can't overwrite\n");
+				close(fd_source);
+				close(fd_destination);
 				return;
 			}
 			else
@@ -540,6 +620,8 @@ void move_file(char *source, char *destination)
 				read_st = read(fd_source, (void*)&in, sizeof(in));
 				wr_st = write(fd_over, (void*)&in, sizeof(in));
 				strcpy(fdmap[pos_source].file, "\0");
+				close(fd_source);
+				close(fd_destination);
 				return;
 			}
 		}
@@ -551,8 +633,59 @@ void move_file(char *source, char *destination)
 			read_st = read(fd_source, (void*)&in, sizeof(in));
 			wr_st = write(fd_destination, (void*)&in, sizeof(in));
 			strcpy(fdmap[pos_source].file, "\0");
+			close(fd_source);
+			close(fd_destination);
 			return;
 		}
+	}
+}
+
+#define EXIT "exit"
+#define MKFS "mkfs"
+#define USE "use"
+#define MV "mv"
+#define RM "rm"
+
+void manual(char *path)
+{
+	if(strcmp(path, MV) == 0)
+	{
+	printf("sash: mv [drive_source_name][:][file_source_name] [drive_dest_name][:][file_dest_name]\n");
+		return;
+	}
+	else if(strcmp(path, LS) == 0)
+	{
+		printf("sash: ls [drive_name][:]\n");
+		return;
+	}
+	else if(strcmp(path, CP) == 0)
+	{
+		printf("sash: cp [file_source_name] [drive_dest_name][:][file_dest_name]\n");
+		return;
+	}
+	else if(strcmp(path, EXIT) == 0)
+	{
+		printf("sash: exit\n");
+		return;
+	}
+	else if(strcmp(path, RM) == 0)
+	{
+		printf("sash: rm [drive_name][:][file_name]\n");
+	}
+	else if(strcmp(path, USE) == 0)
+	{
+		printf("sash: use [file] [as] [drive_name][:]\n");
+		return;
+	}
+	else if(strcmp(path, MKFS) == 0)
+	{
+		printf("sash: mkfs [file] [block_size in B] [file_system_size in MB]\n");
+		return;
+	}
+	else
+	{
+		printf("sash: No manual entry\n");
+		return;
 	}
 }
 
