@@ -86,8 +86,10 @@ int main()
 	        		}
 	        		else res = (A[i-1][j-1] + A[i-1][j] + A[i-1][j+1] + A[i][j-1] + A[i][j] + A[i][j+1] + A[i+1][j-1] + A[i+1][j] + A[i+1][j+1])/9;
 	        		*(childshm+i+(j*n)) = res;
+
 	        		if(*(childshm+i+(j*n)) > *(diff+1)) *(diff+1) = *(childshm+i+(j*n));
 	        		if(*(childshm+i+(j*n)) < *(diff+2)) *(diff+2) = *(childshm+i+(j*n));
+	        		
 	        		*diff = *(diff+1) - *(diff+2);
 	        		int detach1 = shmdt((void *)childshm); //detaches
 	        		if(detach1 == -1) perror("shmdt() failure: ");

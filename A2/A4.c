@@ -33,10 +33,6 @@ int main(int argc, char *argv[]) //take argv from shell
 				perror("execve failed(): ");
 				exit(1);
 			}
-			else
-			{
-				execve(argv[i], myargv, NULL);
-			}
 		}
 		else if(child_pid>0)
 		{

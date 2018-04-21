@@ -29,7 +29,7 @@ int main()
 			/*getpid(): returns process_id of the child*/
 			exit(0); //calling exit() is a good way to cause pending stdio buffers to be flushed twice.
 		}
-		wait(NULL); /*wait() is made, the caller will be blocked until one of its child processes exits*/
+		else wait(NULL); /*wait() is made, the caller will be blocked until one of its child processes exits*/
 	}
 
 	return 0;

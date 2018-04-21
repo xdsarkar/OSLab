@@ -1,0 +1,21 @@
+Pre-requisites:
+
+1) Install GNUReadline as history feature is implemented through it
+	a) sudo apt-get install libreadline6 libreadline6-dev
+2) Type "make" to compile
+3) Type "make clean" to clean the compiled ELF executable (Ubuntu)
+4) Run ./shell
+
+What are implemented?
+1) History (Up key)
+2) Ctrl C terminated the execvp processes and doesn't terminate the shell
+3) Pipe Support (|)
+4) IO redirection (<, >)
+5) Logical OR (||) and Logical AND (&&)
+6) Background Process ([command] &)
+7) Execute multiple commands (;)
+8) Supports all system executables located in default path ($PATH)
+9) Also supports commands with options such as (ls -la), (ls -a)
+10) Internal commands
+
+Note: Some bugs might be there. Please report or fix.

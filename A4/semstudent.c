@@ -75,7 +75,7 @@ int main()
             perror("semget() failed");
             exit(1);
         }
-    } 
+    }
     else 
     {
         int status = semctl(semid, 0, SETVAL, setvalArg);

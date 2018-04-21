@@ -34,7 +34,7 @@ int shstackget(key_t key, int element_size, int stack_size, int shm_stack_flg)
     int semid = semget(key_sem, 1, IPC_CREAT | 0777 | IPC_EXCL); /* int semget(key_t key, int nsems, int semflg); */
     if(semid == -1) 
     {
-        semid = semget(keysem, 1, IPC_CREAT | 0777);
+        semid = semget(key_sem, 1, IPC_CREAT | 0777);
         if(semid == -1) 
         {
             perror("semget() failed");

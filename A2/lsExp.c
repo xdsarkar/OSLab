@@ -3,6 +3,7 @@
 #include <stdio.h>
 
 int main(int argc, int **argv)
+{
   pid_t pid;
   char *myargvlist[]={argv[1],argv[2],NULL};
   if ((pid = fork()) == -1) perror("fork error");

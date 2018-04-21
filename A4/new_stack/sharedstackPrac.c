@@ -39,7 +39,7 @@ typedef struct
 } stack_sh;
 
 void intialize()
-{   
+{
     univ_key = keypub(3);
     global_shmid = shmget(univ_key, sizeof(stack_sh), IPC_CREAT | 0777);
     stack_sh* stack_ptr = (stack_sh*)shmat(global_shmid, NULL, 0);

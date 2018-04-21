@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <error.h>
 #include <sys/ioctl.h>
+#include <math.h>
 #include <stdbool.h>
 
 #define SB_SIZE sizeof(superblock)
@@ -30,6 +31,7 @@
 #define RM "rm"
 #define MAN "man"
 #define CD "cd"
+#define MKFILE "mkfile"
 
 typedef struct {
 	int fsize; /* file system size in blocks */
@@ -76,6 +78,7 @@ void writeScr(char *, int, int);
 void cp(char *, char *);
 void ls();
 void cd( char *);
+void mkfile(char *, char*);
 
 void manual(char *);
 
@@ -228,6 +231,19 @@ void call_sys_calls(char subcommands[][10], int no_commands)
 			return;
 		}
 	}
+	else if(strcmp(subcommands[0], MKFILE) == 0)
+	{
+		if(no_commands <= 3)
+		{
+			mkfile(subcommands[1], subcommands[2]);
+			return;
+		}
+		else
+		{
+			printf("sash: mkfile command failed: expected > mkfile [filename]\n");
+			return;
+		}
+	}
 	else
 	{
 		printf("sash: command not found: %s\n", subcommands[0]);
@@ -238,7 +254,7 @@ void call_sys_calls(char subcommands[][10], int no_commands)
 void create_fs(char *path, int fs_size, int block_size)
 {
 	superblock sb; inode in;
-	int fd = open(path, O_RDWR | O_CREAT | O_EXCL);
+	int fd = open(path, O_RDWR | O_CREAT | O_EXCL, 0777);
     if(fd<0)
     {
         printf("Error opening file system created!\n");
@@ -325,9 +341,65 @@ void use(char *file1, char *file2)
 		}
 	}
     strncpy(fdmap[mount_count].osfile, file1, strlen(file1));
-    printf("sash: Filesystem %s mounted as %c:\n", file1, file2[0]);
+    fdmap[mount_count].osfile[strlen(file1)+1] = '\0';
     fdmap[mount_count].drivename = file2[0];
-    mount_count++;
+    printf("sash: Filesystem %s mounted as %c:\n", fdmap[mount_count].osfile, fdmap[mount_count].drivename);
+    ++mount_count;
+    return;
+}
+
+void ls()
+{
+    char file_name[20];
+    superblock sb; inode in;
+
+    for(int i=0; i<mount_count; i++)
+    {
+        if(fdmap[i].drivename == curr_drive)
+        {
+            strcpy(file_name, fdmap[i].osfile);
+            break;
+        }
+    }
+
+    int fd = open(file_name, O_RDWR);
+    if(fd < 0)
+    {
+        printf("sash: Error while opening file system\n");
+        return;
+    }
+
+    lseek(fd, 0, SEEK_SET);
+
+    int read_status= read(fd, (void *)&sb, sizeof(sb));
+    if(read_status == -1)
+    {
+        printf("sash: Unable to read superblock\n");
+        return;
+    }
+
+    printf("sash: Used inodes: %d\n", sb.inode_count - sb.free_inode_count);
+    for(int i=1; i<MAX_INODE; i++)
+    {
+        if(sb.ibm[i] == '0') continue;
+        lseek(fd, 0, SEEK_SET);
+        lseek(fd, sizeof(sb) + sizeof(in)*(i),SEEK_SET);
+        read_status= read(fd,(void *)&in, sizeof(in));
+        if(read_status==-1)
+        {
+            printf("sash: Unable to read inode\n");
+            return;
+        }
+        printf("%s : %d KB\n", in.filename, in.data_size/(1024));
+    }
+    close(fd);
+}
+
+void cd(char *buf)
+{
+    curr_drive = buf[0];
+    printf("Current working directory -> %c:\n", buf[0]);
+    return;
 }
 
 void cp(char *file1, char *file2)
@@ -363,23 +435,23 @@ void cp(char *file1, char *file2)
     	
         lseek(fd1, 0, SEEK_SET);
     	
-        int read_status= read(fd1, (void *)&sb1, sizeof(sb1));
+        int read_status = read(fd1, (void *)&sb1, sizeof(sb1));
     	if(read_status == -1)
     	{
     		fprintf(stderr, "sash: Error: Unable to read file\n");
     		return;
     	}
     	
-        lseek(fd2,0,SEEK_SET);
+        lseek(fd2, 0, SEEK_SET);
     	
-        read_status= read(fd2, (void *)&sb2, sizeof(sb2));
+        read_status = read(fd2, (void *)&sb2, sizeof(sb2));
         if(read_status == -1)
     	{
     		fprintf(stderr, "sash: Error: Unable to read file\n");
     		return;
     	}
     	
-        for(i=2; i<strlen(file1); i++) fname1[i-2]=file1[i];
+        for(i=2; i<strlen(file1); i++) fname1[i-2]=file1[i]; /* C:[file] */
     	fname1[i]='\0';
 
     	for(i=0; i<MAX_INODE; i++)
@@ -393,7 +465,7 @@ void cp(char *file1, char *file2)
     				fprintf(stderr, "sash: Error: Unable to read inode\n");
     				return;
     			}
-    			if(strncmp(in1.filename, fname1, strlen(in1.filename)) == 0) break;
+    			if(strncmp(in1.filename, fname1, strlen(in1.filename)) == 0) break; /* success reading inode */
     		}
     	}
 
@@ -403,12 +475,14 @@ void cp(char *file1, char *file2)
     		{
     			sb2.ibm[p]='1';
     			sb2.free_inode_count--;
-                tmp1 = p;
+                tmp1 = p; /* inode no just allocated */
     			break;
     		}
     	}
+    	
         char buffer[in1.dblock_count*sb1.block_size];
-        lseek(fd1 ,0 ,SEEK_SET) ;
+
+        lseek(fd1, 0, SEEK_SET) ;
         lseek(fd1, sizeof(sb1) + (sizeof(in1)*MAX_INODE) + in1.dblock_start_loc, SEEK_SET);
         
         read_status = read(fd1, &buffer, sizeof(buffer)); 
@@ -444,7 +518,7 @@ void cp(char *file1, char *file2)
     		fprintf(stderr,"sash: Error: Unable to write back into file\n");
     		return;
     	}
-    	lseek(fd2,sizeof(sb2)+sizeof(in2)*in2.inode_no, SEEK_SET);
+    	lseek(fd2, sizeof(sb2)+sizeof(in2)*in2.inode_no, SEEK_SET);
     	write_status= write(fd2,(void *)&in2,sizeof(in2));
     	if(write_status == -1)
     	{
@@ -461,60 +535,87 @@ void cp(char *file1, char *file2)
     }
 }
 
-void ls()
+void mkfile(char *file, char *file_size)
 {
-    char *file_name;
-    superblock sb; inode inode;
+    char file1[20], file_name[20];
+    int file_sz;
+    superblock sb;
+    inode in;
+    int i=0, j=0; 
+
+    strcpy(file1, file);
+    file_sz = atoi(file_size);
+
+    long int file_sz_bytes = file_sz*1024;
     for(int i=0; i<mount_count; i++)
     {
         if(fdmap[i].drivename == curr_drive)
         {
-            strcpy(file_name,fdmap[i].osfile);
+            strcpy(file_name, fdmap[i].osfile);
             break;
         }
     }
-
-    printf("dsa\n");
-
+    printf("sash: File system (OSFILE): %s\n", file_name);
     int fd = open(file_name, O_RDWR);
     if(fd < 0)
     {
         printf("sash: Error while opening file system\n");
         return;
     }
-
-    lseek(fd, 0, SEEK_SET);
-
-    int read_status= read(fd, (void *)&sb, sizeof(sb));
-    if(read_status == -1)
+    lseek(fd,0,SEEK_SET);
+    int read_status= read(fd,(void *)&sb, sizeof(sb));
+    if(read_status==-1)
     {
-        printf("sash: Unable to read superblock\n");
+        printf("sash: Error while reading superblock\n");
         return;
     }
-
-    printf("sash: Used inodes: %d\n", sb.inode_count - sb.free_inode_count);
-    for(int i=1; i<MAX_INODE; i++)
+    
+    for(i=0; i<MAX_INODE; i++)
     {
-        if(sb.ibm[i] == '0') continue;
-        lseek(fd, 0, SEEK_SET);
-        lseek(fd, sizeof(sb) + sizeof(inode)*(i),SEEK_SET);
-        read_status= read(fd,(void *)&inode, sizeof(inode));
-        if(read_status==-1)
+        if(sb.ibm[i]=='0')
         {
-            printf("sash: Unable to read inode\n");
-            return;
+            sb.ibm[i]='1';
+            sb.free_inode_count--;
+            printf("sash: Free Inode Count: %d. Success.\n",sb.free_inode_count);
+            for(j=0; j<MAX_DATA_BLOCK; j++)
+            {
+                if(sb.dbm[j]=='0')
+                {
+                    sb.dbm[j]='1';
+                    break;
+                }
+            }
+            break;
         }
-        printf("%s : ", inode.filename);
-        printf("%d B\n", inode.data_size);
+    }
+    
+    int dblocks = ceil(file_sz_bytes/sb.block_size);
+    in.inode_no = i;
+    in.type = 'f';
+    in.data_size = file_sz_bytes;
+    strcpy(in.filename, file1);
+    in.dblock_count = dblocks;
+    in.dblock_count++;
+    in.dblock_start_loc = j;
+    for(int k=0; k<MAX_DATA_BLOCK; k++) in.i_dbm[k] = -1;
+    lseek(fd,0,SEEK_SET);
+    lseek(fd,sizeof(sb)+sizeof(in)*i, SEEK_SET);
+    int write_status= write(fd, (void *)&in, sizeof(in));
+    if(write_status == -1)
+    {
+        printf("sash: Error while writing into the inode\n");
+        return;
+    }
+    for(int k=j; k < (dblocks+j); k++) sb.dbm[k]='1';
+    sb.free_data_block_count -= dblocks;
+    lseek(fd,0,SEEK_SET);
+    write_status= write(fd, (void *)&sb, sizeof(sb));
+    if(write_status == -1)
+    {
+        printf("sash: Error while writing back into the superblock\n");
+        return;
     }
     close(fd);
-}
-
-void cd(char *buf)
-{
-    curr_drive = buf[0];
-    printf("Current working directory -> %c:\n", buf[0]);
-    return;
 }
 
 #define EXIT "exit"
@@ -557,6 +658,11 @@ void manual(char *path)
 	else if(strcmp(path, MKFS) == 0)
 	{
 		printf("sash: mkfs [file] [block_size in B] [file_system_size in MB]\n");
+		return;
+	}
+	else if(strcmp(path, MKFILE) == 0)
+	{
+		printf("sash: mkfile [file] [file_size in KB]\n");
 		return;
 	}
 	else
